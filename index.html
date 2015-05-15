@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Quaesitio: Ask and Answer</title>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+        <link rel="stylesheet" href="style.css">
+
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+            <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+        <![endif]-->
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+        <script src="https://cdn.firebase.com/js/client/2.2.4/firebase.js"></script>
+
+    </head>
+
+    <body>
+
+        <script>
+            var questionsRef = new Firebase('https://quaesitio.firebaseio.com/questions');
+
+            questionsRef.on("child_added", 
+                function(snapshot) {
+                    console.log(snapshot.key() + ": " + JSON.stringify(snapshot.val()));
+                    $("#questions").append("<div class='row show-grid'><div class='col-md-12 question'>" +
+                            "<a href='/q/" + snapshot.key() + "'><h2>" +
+                            snapshot.val().text +
+                            "</h2></a></div></div>") 
+                }, 
+                function (errorObject) {
+                    console.log("The read failed: " + errorObject.code);
+                }
+            );
+
+            function string_to_slug(str) {
+                
+              str = str.toLowerCase();
+
+              // remove accents, swap ñ for n, etc
+              var from = "àáäâèéëêìíïîòóöôùúüûñç·/_,:;",
+                  to   = "aaaaeeeeiiiioooouuuunc------";
+              for (var i=0, l=from.length ; i<l ; i++) {
+                str = str.replace(from[i], to[i]);
+              }
+
+              str = str.replace(/[^a-z0-9 -]/g, '') // remove invalid chars
+                .replace(/\s+/g, '-') // collapse whitespace and replace by -
+                .replace(/-+/g, '-'); // collapse dashes
+                
+              // Trim leading and trailing whitespace and dashes. 
+              str = str.replace(/^[\s|-]+|[\s|-]+$/g, '');
+
+              return str;
+            }
+
+
+            $( document ).ready(function() {
+
+                $("#newQuestion").submit(function(event) {
+                    event.preventDefault();
+                    var text = $("#questionText").val();
+                    console.log(text);
+                    var key = string_to_slug(text);
+                    console.log(key);
+                    questionsRef.child(key).set({text : text});
+                    return false;
+                });
+
+            });
+
+        </script>
+
+        <div class="container" id="main">
+            
+            <h1>Answer a Question</h1>
+
+            <div class="container" id="questions">
+            </div> <!-- questions container -->
+
+            <!-- sample question format
+            <div class="row show-grid">
+                <div class="col-md-12 question">
+                    <a href="/q/this-is-a-question">
+                        <h2>This is a question</h2>
+                    </a>
+                </div>
+            </div>
+            -->
+
+            <h1>Ask a Question</h1>
+
+            <div class="container">
+                <div class="row">
+                    <form class="form-horizontal" id="newQuestion" action="#">
+                        <div class="col-md-10">
+                            <input type="text" class="form-control input-lg" id="questionText" placeholder="What do you want to ask?">
+                        </div>
+                        <div class="col-md-2">    
+                            <button type="submit" class="btn btn-success btn-lg">Submit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div> <!-- main container -->
+
+    </body>
+
+</html>

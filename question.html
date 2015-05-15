@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Quaesitio: Ask and Answer</title>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+        <link rel="stylesheet" href="//assets.ziggeo.com/css/ziggeo-betajs-player.min.css" />
+        <link rel="stylesheet" href="/style.css">
+
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+            <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+        <![endif]-->
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+        <script src="https://cdn.firebase.com/js/client/2.2.4/firebase.js"></script>
+        <script src="//assets.ziggeo.com/js/ziggeo-json2-betajs-player.min.js"></script>
+        <script>ZiggeoApi.token = "a51b9276d01c8de6e2eb5a9b3cd4f237";</script>
+
+    </head>
+
+    <body>
+
+        <script>
+            var key = window.location.pathname.substr(3); // get just the part after /q/
+            console.log(key);
+
+            var questionRef = new Firebase('https://quaesitio.firebaseio.com/questions/' + key);
+            
+            questionRef.on("value", 
+                function(snapshot) {
+                    console.log(snapshot.val());
+                    $("#question").prepend(snapshot.val().text);
+                }, 
+                function (errorObject) {
+                    console.log("The read failed: " + errorObject.code);
+                }
+            );
+
+            var videosRef = new Firebase('https://quaesitio.firebaseio.com/videos/' + key);
+
+            function resetRecorder() {
+                $("#recorder").html("<ziggeo ziggeo-width=320 ziggeo-height=240 ziggeo-limit=20 ziggeo-face_outline=true ziggeo-effect_profile='_black-and-white'></ziggeo>");
+            }
+
+            // adds row to videos container with a ziggeo player
+            function addPlayer(token) {
+                if (Math.max(document.documentElement.clientWidth, window.innerWidth || 0) > 640)
+                    var width = 640, height = 480;
+                else
+                    var width = 320, height = 240;
+                    $("#videos").prepend("<div class='row show-grid' id='" + token + "'><div class='col-md-8 answer'>" +
+                                        "<ziggeo ziggeo-video='" + token + "' ziggeo-width='" + width +
+                                        "' ziggeo-height='" + height + "' ziggeo-effect_profile='_black-and-white'></ziggeo>" +
+                                        "</div></div>");
+            }
+
+            // html fragment for displaying a tag
+            function makeTag(tag) {
+                return("<button type='button' class='btn btn-default'>" + tag + "</button>");
+            }
+
+            // add tags next to a video player
+            // for now just "male", "female", "person", "persons", "not a person"
+            function addTags(token, tags) {
+                tag_html = "";
+                if (tags["men"] > 0.95 && tags["portrait"] > 0.95) tag_html += makeTag("male");
+                if (tags["women"] > 0.95 && tags["portrait"] > 0.95) tag_html += makeTag("female");
+                if (tags["men"] > 0.95 && tags["women"] > 0.95 && tags["portrait"] > 0.95) tag_html += makeTag("persons");
+                if (tags["men"] > 0.95 && tags["women"] < 0.8 && tags["portrait"] > 0.95) tag_html += makeTag("person");
+                if (tags["men"] < 0.8 && tags["women"] > 0.95 && tags["portrait"] > 0.95) tag_html += makeTag("person");
+                if (tags["portrait"] < 0.8 && tags["nobody"] > 0.4 && tags["people"] < 0.9) tag_html = makeTag("not a person?")
+                $("#" + token).append("<div class='col-md-4 tags'>" + tag_html + "</div>");
+            }
+
+            function computeTags(classesTime, probsTime) {
+                var tags = {}, classes = [], probs = [];
+                for (var t = 0; t < classesTime.length; t++) {
+                    classes = classesTime[t];
+                    probs = probsTime[t];
+                    for (var i = 0; i < classes.length; i++) {
+                        tag = classes[i];
+                        if (tags[tag] === undefined || probs[i] > tags[tag]) tags[tag] = probs[i];
+                    }
+                }
+                console.log(tags);
+                return tags;
+            }
+
+            function tagVideo(videoIdFirebase, videoTokenZiggeo) {
+                console.log("Tagging for id : " + videoIdFirebase + "; token: " + videoTokenZiggeo);
+
+                var sources = ZiggeoApi.Videos.sources(videoTokenZiggeo);
+                var mp4_url = sources[0];
+                // console.log(mp4_url);
+
+                $.ajax({
+                    method: "POST",
+                    url: "https://api.clarifai.com/v1/tag/",
+                    headers: {Authorization: "Bearer OFTOfRCXzvTBP0ZNzcisvEMk2fbuEx"},
+                    data: {url : mp4_url, select_classes: "people,men,women,portrait,nobody" }
+                })
+                    .done(function(msg) {
+                        // console.log(msg);
+                        // console.log(msg.results[0].result.tag.classes[0]);
+                        // console.log(msg.results[0].result.tag.probs[0]);
+                        tags = computeTags(msg.results[0].result.tag.classes, msg.results[0].result.tag.probs);
+                        videosRef.child(videoIdFirebase).update({tags : tags});
+                        addTags(videoTokenZiggeo, tags);
+                });
+
+            }
+
+            videosRef.on('child_added', function(snapshot) {
+                var token = snapshot.val().token;
+                console.log("new video from firebase with Ziggeo token " + token);
+                addPlayer(token);
+                if (!snapshot.val().tags) {
+                    console.log("video has no tags");
+                    tagVideo(snapshot.key(), token);
+                }
+                else addTags(token, snapshot.val().tags);
+            });
+
+            ZiggeoApi.Events.on("submitted", function (data) {
+                console.log("new video submitted with token " + data.video.token);
+                videosRef.push({token : data.video.token, date : (new Date()).getTime()});
+                resetRecorder();
+        });
+
+
+        </script>
+        
+        <div class="container" id="main">
+
+            <div class="row show-grid">
+                <div class="col-md-8 question">
+                    <h1 id="question"></h1>
+                    <p>(Answers are limited to 20 seconds and will be turned into black and white)</p>
+                </div>
+                <div class="col-md-4 recorder">
+                    <div id="recorder">
+                        <ziggeo ziggeo-width=320
+                                ziggeo-height=240
+                                ziggeo-limit=20
+                                ziggeo-face_outline=true
+                                ziggeo-effect_profile="_black-and-white">
+                        </ziggeo>
+                    </div>
+                </div>
+            </div>
+
+            <div id="videos">
+            </div> <!-- videos container -->
+
+        </div> <!-- main container -->
+
+    </body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+  "firebase": "quaesitio",
+  "public": ".",
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**"
+  ],
+
+  "rewrites": [ {
+    "source": "/q/*",
+    "destination": "/question.html"
+  } ]
+}
