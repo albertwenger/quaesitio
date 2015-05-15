@@ -20,7 +20,7 @@
         <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
         <script src="https://cdn.firebase.com/js/client/2.2.4/firebase.js"></script>
         <script src="//assets.ziggeo.com/js/ziggeo-json2-betajs-player.min.js"></script>
-        <script>ZiggeoApi.token = "a51b9276d01c8de6e2eb5a9b3cd4f237";</script>
+        <script>ZiggeoApi.token = "your-ziggeo-api-token-here";</script>
 
     </head>
 
@@ -67,6 +67,7 @@
 
             // add tags next to a video player
             // for now just "male", "female", "person", "persons", "not a person"
+            // super hacky and needs to be redone
             function addTags(token, tags) {
                 tag_html = "";
                 if (tags["men"] > 0.95 && tags["portrait"] > 0.95) tag_html += makeTag("male");
@@ -102,7 +103,7 @@
                 $.ajax({
                     method: "POST",
                     url: "https://api.clarifai.com/v1/tag/",
-                    headers: {Authorization: "Bearer OFTOfRCXzvTBP0ZNzcisvEMk2fbuEx"},
+                    headers: {Authorization: "Bearer your-clarifai-token-here"}, // your token here
                     data: {url : mp4_url, select_classes: "people,men,women,portrait,nobody" }
                 })
                     .done(function(msg) {
